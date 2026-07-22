@@ -1,8 +1,8 @@
 import { Dashboard } from "@/components/Dashboard";
-import { ErrorState } from "@/components/ErrorState";
 import { CURRICULUM } from "@/lib/curriculum";
-import { predictRisk } from "@/lib/predict";
+import { MissingApiKeyError, predictRisk } from "@/lib/predict";
 import { STUDENT } from "@/lib/student";
+import type { RiskPrediction } from "@/lib/types";
 
 // Predictions come from a live model call over hardcoded data — no DB to
 // cache against, so each request re-evaluates rather than serving a
@@ -10,12 +10,20 @@ import { STUDENT } from "@/lib/student";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  let predictions;
-  let errorMessage: string | null = null;
+  let predictions: RiskPrediction[] | null = null;
+  let initialStatus: "ready" | "missing-key" | "error" = "missing-key";
+  let initialMessage: string | undefined;
+
   try {
     predictions = await predictRisk();
+    initialStatus = "ready";
   } catch (error) {
-    errorMessage = error instanceof Error ? error.message : "Unknown error";
+    if (error instanceof MissingApiKeyError) {
+      initialStatus = "missing-key";
+    } else {
+      initialStatus = "error";
+      initialMessage = error instanceof Error ? error.message : "Unknown error";
+    }
   }
 
   return (
@@ -30,11 +38,13 @@ export default async function Home() {
           and this student&rsquo;s evidence-tagged performance history.
         </p>
       </header>
-      {errorMessage || !predictions ? (
-        <ErrorState message={errorMessage ?? "No predictions were returned."} />
-      ) : (
-        <Dashboard curriculum={CURRICULUM} student={STUDENT} predictions={predictions} />
-      )}
+      <Dashboard
+        curriculum={CURRICULUM}
+        student={STUDENT}
+        initialPredictions={predictions}
+        initialStatus={initialStatus}
+        initialMessage={initialMessage}
+      />
     </main>
   );
 }

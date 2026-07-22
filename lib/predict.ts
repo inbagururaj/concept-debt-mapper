@@ -1,5 +1,5 @@
 import "server-only";
-import { anthropic } from "@ai-sdk/anthropic";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { CURRICULUM } from "./curriculum";
@@ -57,9 +57,27 @@ For each topic, produce:
 Return a prediction for every topic listed in the curriculum, including strong ones (low risk, low-to-medium confidence depending on evidence richness).`;
 }
 
-export async function predictRisk(): Promise<RiskPrediction[]> {
+/** Thrown when neither a user-supplied key nor ANTHROPIC_API_KEY is available. */
+export class MissingApiKeyError extends Error {
+  constructor() {
+    super("No Anthropic API key available.");
+    this.name = "MissingApiKeyError";
+  }
+}
+
+/**
+ * Runs the single prediction call. `userApiKey` (BYOK, entered in the
+ * browser) takes priority when present; otherwise falls back to the
+ * server's ANTHROPIC_API_KEY env var. Neither present -> MissingApiKeyError,
+ * so callers can prompt for a key instead of attempting the call.
+ */
+export async function predictRisk(userApiKey?: string): Promise<RiskPrediction[]> {
+  const apiKey = userApiKey?.trim() || process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new MissingApiKeyError();
+
+  const provider = createAnthropic({ apiKey });
   const { output } = await generateText({
-    model: anthropic("claude-sonnet-5"),
+    model: provider("claude-sonnet-5"),
     output: Output.object({ schema: predictionSchema }),
     prompt: buildPrompt(CURRICULUM, STUDENT),
   });

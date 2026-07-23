@@ -42,12 +42,12 @@ export function GraphNode({
           boxShadow: isSelected ? "0 0 0 2px var(--pine)" : "none",
         }}
       >
-        <span className="font-sans text-[11px] font-medium leading-tight text-(--ink)">
+        <span className="line-clamp-3 font-sans text-[10px] font-medium leading-tight text-(--ink)">
           {topic}
         </span>
-        <span className="font-mono text-[10px] text-(--ink-muted)">
+        <span className="font-mono text-[9px] text-(--ink-muted)">
           {isUntested ? "untested" : "tested"}
-          {prediction ? ` · risk ${Math.round(risk * 100)}%` : ""}
+          {prediction ? ` · ${Math.round(risk * 100)}%` : ""}
         </span>
       </button>
     </foreignObject>

@@ -7,11 +7,14 @@ import { GraphEdge } from "./GraphEdge";
 import { GraphLegend } from "./GraphLegend";
 import { GraphNode } from "./GraphNode";
 
-const NODE_WIDTH = 172;
-const NODE_HEIGHT = 60;
-const COLUMN_GAP = 204;
-const ROW_GAP = 118;
-const PADDING = 32;
+const NODE_WIDTH = 126;
+const NODE_HEIGHT = 64;
+// Horizontal flow: level (prerequisite depth) runs left-to-right along the
+// x-axis, so a 20-node, 8-level-deep graph reads as a short wide band
+// instead of a tall column that needs scrolling to see fully.
+const LEVEL_GAP = 142;
+const ROW_GAP = 96;
+const PADDING = 28;
 
 interface DependencyGraphProps {
   curriculum: Topic[];
@@ -30,16 +33,17 @@ export function DependencyGraph({
 }: DependencyGraphProps) {
   const layout = useMemo(() => computeGraphLayout(curriculum), [curriculum]);
 
-  const maxColumns = Math.max(...layout.map((n) => n.columnsInLevel));
+  const maxRowsInLevel = Math.max(...layout.map((n) => n.columnsInLevel));
   const maxLevel = Math.max(...layout.map((n) => n.level));
-  const width = PADDING * 2 + maxColumns * COLUMN_GAP;
-  const height = PADDING * 2 + (maxLevel + 1) * ROW_GAP;
+  const levelCount = maxLevel + 1;
+  const width = PADDING * 2 + levelCount * LEVEL_GAP;
+  const height = PADDING * 2 + maxRowsInLevel * ROW_GAP;
 
   const centerOf = (node: (typeof layout)[number]) => {
-    const levelWidth = node.columnsInLevel * COLUMN_GAP;
-    const levelOffset = (maxColumns * COLUMN_GAP - levelWidth) / 2;
-    const x = PADDING + levelOffset + node.column * COLUMN_GAP + COLUMN_GAP / 2;
-    const y = PADDING + node.level * ROW_GAP + ROW_GAP / 2;
+    const levelHeight = node.columnsInLevel * ROW_GAP;
+    const levelOffset = (maxRowsInLevel * ROW_GAP - levelHeight) / 2;
+    const x = PADDING + node.level * LEVEL_GAP + LEVEL_GAP / 2;
+    const y = PADDING + levelOffset + node.column * ROW_GAP + ROW_GAP / 2;
     return { x, y };
   };
 
@@ -54,11 +58,12 @@ export function DependencyGraph({
           Prerequisite dependency graph
         </h2>
         <p className="font-mono text-[11px] text-(--ink-muted)">
-          {curriculum.length} topics · click a node for detail
+          {curriculum.length} topics · flows left (foundational) to right
+          (advanced) · click a node for detail
         </p>
       </div>
       <div className="overflow-x-auto px-2 py-2">
-        <svg width={width} height={height} role="img" aria-label="Algebra 1 prerequisite dependency graph">
+        <svg width={width} height={height} role="img" aria-label="Algebra 1 prerequisite dependency graph, flowing left to right by prerequisite depth">
           <g>
             {curriculum.flatMap((t) =>
               t.prerequisites.map((prereq) => {
@@ -68,10 +73,10 @@ export function DependencyGraph({
                 return (
                   <GraphEdge
                     key={`${prereq}->${t.topic}`}
-                    fromX={from.center.x}
-                    fromY={from.center.y + NODE_HEIGHT / 2}
-                    toX={to.center.x}
-                    toY={to.center.y - NODE_HEIGHT / 2}
+                    fromX={from.center.x + NODE_WIDTH / 2}
+                    fromY={from.center.y}
+                    toX={to.center.x - NODE_WIDTH / 2}
+                    toY={to.center.y}
                   />
                 );
               }),

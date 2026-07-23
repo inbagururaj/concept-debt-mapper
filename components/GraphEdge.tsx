@@ -5,10 +5,10 @@ interface GraphEdgeProps {
   toY: number;
 }
 
-/** A single prerequisite -> dependent edge, drawn as a gentle curve. */
+/** A single prerequisite -> dependent edge, curving horizontally left to right. */
 export function GraphEdge({ fromX, fromY, toX, toY }: GraphEdgeProps) {
-  const midY = (fromY + toY) / 2;
-  const path = `M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${toY}`;
+  const midX = (fromX + toX) / 2;
+  const path = `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
   return (
     <path
       d={path}

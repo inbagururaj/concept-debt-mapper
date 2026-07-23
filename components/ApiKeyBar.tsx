@@ -6,18 +6,22 @@ interface ApiKeyBarProps {
   apiKey: string;
   onApiKeyChange: (key: string) => void;
   onSubmit: () => void;
+  onCancel: () => void;
   loading: boolean;
   statusLabel: string;
   errorMessage?: string | null;
+  tokensUsed: number;
 }
 
 export function ApiKeyBar({
   apiKey,
   onApiKeyChange,
   onSubmit,
+  onCancel,
   loading,
   statusLabel,
   errorMessage,
+  tokensUsed,
 }: ApiKeyBarProps) {
   const [revealed, setRevealed] = useState(false);
 
@@ -46,7 +50,8 @@ export function ApiKeyBar({
           onChange={(e) => onApiKeyChange(e.target.value)}
           placeholder="sk-ant-..."
           autoComplete="off"
-          className="min-w-0 flex-1 rounded border border-(--line) bg-(--paper-raised) px-2.5 py-1.5 font-mono text-xs text-(--ink) outline-none focus:border-(--pine)"
+          disabled={loading}
+          className="min-w-0 flex-1 rounded border border-(--line) bg-(--paper-raised) px-2.5 py-1.5 font-mono text-xs text-(--ink) outline-none focus:border-(--pine) disabled:opacity-60"
         />
         <button
           type="button"
@@ -55,17 +60,34 @@ export function ApiKeyBar({
         >
           {revealed ? "hide" : "show"}
         </button>
-        <button
-          type="submit"
-          disabled={loading || apiKey.trim().length === 0}
-          className="rounded bg-(--pine) px-3 py-1.5 font-mono text-xs text-(--paper) disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-        >
-          {loading ? "running…" : "use this key"}
-        </button>
+        {loading ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded border border-(--rust) px-3 py-1.5 font-mono text-xs text-(--rust) cursor-pointer"
+          >
+            cancel
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={apiKey.trim().length === 0}
+            className="rounded bg-(--pine) px-3 py-1.5 font-mono text-xs text-(--paper) disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+          >
+            use this key
+          </button>
+        )}
       </form>
-      {errorMessage && (
-        <p className="mt-2 font-mono text-xs text-(--rust)">{errorMessage}</p>
-      )}
+      <div className="mt-2 flex items-center justify-between">
+        {errorMessage ? (
+          <p className="font-mono text-xs text-(--rust)">{errorMessage}</p>
+        ) : (
+          <span />
+        )}
+        <p className="font-mono text-[11px] text-(--ink-muted)">
+          {tokensUsed.toLocaleString()} tokens used this session
+        </p>
+      </div>
     </div>
   );
 }

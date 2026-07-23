@@ -4,7 +4,9 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 import { CURRICULUM } from "./curriculum";
 import { STUDENT } from "./student";
-import type { RiskPrediction, StudentProfile, Topic } from "./types";
+import type { RiskPrediction, StudentProfile, TokenUsage, Topic } from "./types";
+
+const PREDICTION_TIMEOUT_MS = 60_000;
 
 const predictionSchema = z.object({
   predictions: z.array(
@@ -65,21 +67,66 @@ export class MissingApiKeyError extends Error {
   }
 }
 
+/** Thrown when the call doesn't complete within PREDICTION_TIMEOUT_MS. */
+export class PredictionTimeoutError extends Error {
+  constructor() {
+    super("The prediction call timed out after 60s. Check your connection and try again.");
+    this.name = "PredictionTimeoutError";
+  }
+}
+
+export interface PredictionResult {
+  predictions: RiskPrediction[];
+  usage: TokenUsage;
+}
+
 /**
  * Runs the single prediction call. `userApiKey` (BYOK, entered in the
  * browser) takes priority when present; otherwise falls back to the
  * server's ANTHROPIC_API_KEY env var. Neither present -> MissingApiKeyError,
  * so callers can prompt for a key instead of attempting the call.
+ *
+ * Bounded by a hard 60s timeout so a stalled network call can never hang a
+ * caller forever. `externalSignal` (e.g. a Route Handler's request.signal)
+ * is forwarded so a client-initiated cancel actually aborts the in-flight
+ * request to Anthropic, not just the UI's wait for it.
  */
-export async function predictRisk(userApiKey?: string): Promise<RiskPrediction[]> {
+export async function predictRisk(
+  userApiKey?: string,
+  externalSignal?: AbortSignal,
+): Promise<PredictionResult> {
   const apiKey = userApiKey?.trim() || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new MissingApiKeyError();
 
-  const provider = createAnthropic({ apiKey });
-  const { output } = await generateText({
-    model: provider("claude-sonnet-5"),
-    output: Output.object({ schema: predictionSchema }),
-    prompt: buildPrompt(CURRICULUM, STUDENT),
-  });
-  return output.predictions;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, PREDICTION_TIMEOUT_MS);
+  const onExternalAbort = () => controller.abort();
+  externalSignal?.addEventListener("abort", onExternalAbort);
+
+  try {
+    const provider = createAnthropic({ apiKey });
+    const { output, usage } = await generateText({
+      model: provider("claude-sonnet-5"),
+      output: Output.object({ schema: predictionSchema }),
+      prompt: buildPrompt(CURRICULUM, STUDENT),
+      abortSignal: controller.signal,
+    });
+    return {
+      predictions: output.predictions,
+      usage: {
+        inputTokens: usage.inputTokens ?? 0,
+        outputTokens: usage.outputTokens ?? 0,
+      },
+    };
+  } catch (error) {
+    if (timedOut) throw new PredictionTimeoutError();
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    externalSignal?.removeEventListener("abort", onExternalAbort);
+  }
 }

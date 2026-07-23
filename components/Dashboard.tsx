@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { runPrediction } from "@/app/actions";
-import type { RiskPrediction, StudentProfile, Topic } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import type { PredictResponse } from "@/app/api/predict/route";
+import type { RiskPrediction, StudentProfile, TokenUsage, Topic } from "@/lib/types";
 import { ApiKeyBar } from "./ApiKeyBar";
 import { DependencyGraph } from "./DependencyGraph";
 import { DetailPanel } from "./DetailPanel";
 import { ScoreOverview } from "./ScoreOverview";
 
 const MAX_REVIEW_SELECTIONS = 2;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 type KeySource = "env" | "session" | "none";
 type Status = "ready" | "missing-key" | "error";
@@ -17,6 +18,7 @@ interface DashboardProps {
   curriculum: Topic[];
   student: StudentProfile;
   initialPredictions: RiskPrediction[] | null;
+  initialUsage?: TokenUsage;
   initialStatus: Status;
   initialMessage?: string;
 }
@@ -25,6 +27,7 @@ export function Dashboard({
   curriculum,
   student,
   initialPredictions,
+  initialUsage,
   initialStatus,
   initialMessage,
 }: DashboardProps) {
@@ -38,24 +41,80 @@ export function Dashboard({
     initialStatus === "error" ? initialMessage : undefined,
   );
   const [apiKey, setApiKey] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [tokensUsed, setTokensUsed] = useState(
+    initialUsage ? initialUsage.inputTokens + initialUsage.outputTokens : 0,
+  );
+  const [isLoading, setIsLoading] = useState(false);
 
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [reviewSelection, setReviewSelection] = useState<string[]>([]);
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = useRef(false);
+  const timedOutRef = useRef(false);
+
+  // Best-effort cleanup: abort any in-flight request if the dashboard unmounts.
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
+    };
+  }, []);
+
   const handleSubmitKey = () => {
     const key = apiKey.trim();
-    if (!key) return;
-    startTransition(async () => {
-      const result = await runPrediction(key);
-      if (result.ok) {
-        setPredictions(result.predictions);
-        setKeySource("session");
-        setErrorMessage(undefined);
-      } else {
-        setErrorMessage(result.message);
-      }
-    });
+    if (!key || isLoading) return;
+
+    cancelledRef.current = false;
+    timedOutRef.current = false;
+    setErrorMessage(undefined);
+    setIsLoading(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    timeoutIdRef.current = setTimeout(() => {
+      timedOutRef.current = true;
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
+
+    fetch("/api/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey: key }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        const data = (await res.json()) as PredictResponse;
+        if (data.ok) {
+          setPredictions(data.predictions);
+          setKeySource("session");
+          setTokensUsed((t) => t + data.usage.inputTokens + data.usage.outputTokens);
+        } else {
+          setErrorMessage(data.message);
+        }
+      })
+      .catch(() => {
+        if (cancelledRef.current) {
+          setErrorMessage("Cancelled.");
+        } else if (timedOutRef.current) {
+          setErrorMessage(
+            "Request timed out after 60s. Check your connection and try again.",
+          );
+        } else {
+          setErrorMessage("Network error — the request failed before reaching the server.");
+        }
+      })
+      .finally(() => {
+        if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
+        abortControllerRef.current = null;
+        setIsLoading(false);
+      });
+  };
+
+  const handleCancel = () => {
+    cancelledRef.current = true;
+    abortControllerRef.current?.abort();
   };
 
   const handleSelectTopic = (topic: string) => {
@@ -92,24 +151,24 @@ export function Dashboard({
         apiKey={apiKey}
         onApiKeyChange={setApiKey}
         onSubmit={handleSubmitKey}
-        loading={isPending}
+        onCancel={handleCancel}
+        loading={isLoading}
         statusLabel={statusLabel}
         errorMessage={errorMessage}
+        tokensUsed={tokensUsed}
       />
 
       {predictions ? (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="flex flex-col gap-5">
+        <>
+          <DependencyGraph
+            curriculum={curriculum}
+            student={student}
+            predictions={predictions}
+            selectedTopic={selectedTopic}
+            onSelectTopic={handleSelectTopic}
+          />
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
             <ScoreOverview student={student} curriculum={curriculum} />
-            <DependencyGraph
-              curriculum={curriculum}
-              student={student}
-              predictions={predictions}
-              selectedTopic={selectedTopic}
-              onSelectTopic={handleSelectTopic}
-            />
-          </div>
-          <div className="lg:sticky lg:top-5 lg:self-start">
             {selectedTopic ? (
               <DetailPanel
                 key={selectedTopic}
@@ -127,10 +186,10 @@ export function Dashboard({
               </div>
             )}
           </div>
-        </div>
+        </>
       ) : (
         <div className="rounded-lg border border-(--line) bg-(--paper) p-4 text-sm text-(--ink-muted)">
-          {isPending
+          {isLoading
             ? "Reasoning over the prerequisite graph and performance evidence…"
             : "No predictions yet — enter an Anthropic API key above and run it, or set ANTHROPIC_API_KEY in .env.local on the server."}
         </div>

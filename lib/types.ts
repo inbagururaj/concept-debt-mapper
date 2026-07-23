@@ -47,6 +47,12 @@ export interface RemediationEstimate {
   traceCoverage: number;
 }
 
+/** Real token counts reported by the Anthropic API for one completed call. */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 /** Deterministic layout position for a topic node in the dependency graph. */
 export interface GraphNodePosition {
   topic: string;

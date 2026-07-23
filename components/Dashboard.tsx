@@ -11,6 +11,17 @@ import { ScoreOverview } from "./ScoreOverview";
 const MAX_REVIEW_SELECTIONS = 2;
 const REQUEST_TIMEOUT_MS = 60_000;
 
+/** One-line "why" for the top-risk headline — top traced prerequisite if any, else the model's own reasoning. */
+function headlineReason(prediction: RiskPrediction): string {
+  const top = [...prediction.contributingFactors].sort(
+    (a, b) => b.contributionWeight - a.contributionWeight,
+  )[0];
+  if (top) {
+    return `Driven mainly by weak "${top.prerequisiteTopic}" (score ${top.score}/100, ${Math.round(top.contributionWeight)}% of risk).`;
+  }
+  return prediction.reasoning;
+}
+
 type KeySource = "env" | "session" | "none";
 type Status = "ready" | "missing-key" | "error";
 
@@ -130,6 +141,13 @@ export function Dashboard({
     });
   };
 
+  const topRiskPrediction =
+    predictions && predictions.length > 0
+      ? predictions.reduce((max, p) =>
+          p.riskProbability > max.riskProbability ? p : max,
+        )
+      : null;
+
   const selectedEvidence = selectedTopic
     ? student.history.find((h) => h.topic === selectedTopic)
     : undefined;
@@ -147,6 +165,20 @@ export function Dashboard({
 
   return (
     <div className="flex flex-col gap-5">
+      {topRiskPrediction && (
+        <div className="rounded-lg border border-(--rust) bg-(--paper) p-4">
+          <p className="font-sans text-xs font-medium text-(--ink-muted)">
+            Next concept likely to fail
+          </p>
+          <p className="mt-1 font-serif text-xl font-semibold text-(--ink)">
+            {topRiskPrediction.topic} —{" "}
+            {Math.round(topRiskPrediction.riskProbability * 100)}% risk
+          </p>
+          <p className="mt-1 text-sm text-(--ink-muted)">
+            {headlineReason(topRiskPrediction)}
+          </p>
+        </div>
+      )}
       <ApiKeyBar
         apiKey={apiKey}
         onApiKeyChange={setApiKey}

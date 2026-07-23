@@ -57,7 +57,9 @@ export function DetailPanel({
       </div>
       <div className="mt-4">
         {activeTab === "overview" && <OverviewTab topic={topic} evidence={evidence} />}
-        {activeTab === "why" && <WhyAtRiskTab prediction={prediction} />}
+        {activeTab === "why" && (
+          <WhyAtRiskTab prediction={prediction} evidence={evidence} />
+        )}
         {activeTab === "plan" && (
           <ReviewPlanTab
             topic={topic}

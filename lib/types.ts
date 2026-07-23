@@ -27,13 +27,36 @@ export interface StudentProfile {
 
 export type Confidence = "high" | "medium" | "low";
 
+/**
+ * One prerequisite's traced contribution to a topic's predicted risk,
+ * produced by the LLM alongside the overall prediction.
+ */
+export interface ContributingFactor {
+  prerequisiteTopic: string;
+  /** The prerequisite's own recorded score (0-100). */
+  score: number;
+  /**
+   * Percentage points (0-100) of the topic's own riskProbability*100
+   * attributable to this prerequisite's weakness. Weights across all
+   * factors for a topic sum to no more than riskProbability*100 — any
+   * remainder reflects risk from the topic's own evidence.
+   */
+  contributionWeight: number;
+  citedMistakes: string[];
+}
+
 /** One LLM-produced risk assessment for a single topic. */
 export interface RiskPrediction {
   topic: string;
   riskProbability: number;
   confidence: Confidence;
   reasoning: string;
-  citedEvidence: string[];
+  contributingFactors: ContributingFactor[];
+  /**
+   * Derived in predict.ts from contributingFactors (prerequisiteTopic
+   * names) — kept as its own field since lib/remediation.ts traces risk
+   * reduction by topic name, not by the full factor breakdown.
+   */
   contributingWeakTopics: string[];
 }
 

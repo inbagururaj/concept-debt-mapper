@@ -30,12 +30,12 @@ export default async function Home() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-6 py-8">
+    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-10">
       <header>
-        <h1 className="font-serif text-2xl font-semibold text-(--ink)">
+        <h1 className="font-serif text-4xl font-bold tracking-tight text-(--ink)">
           Concept Debt Mapper
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-(--ink-muted)">
+        <p className="mt-2 max-w-2xl text-base text-(--ink)/80">
           Predicts {STUDENT.name}&rsquo;s next likely struggle in Algebra 1.
         </p>
       </header>

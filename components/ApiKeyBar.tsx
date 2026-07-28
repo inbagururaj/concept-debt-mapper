@@ -24,20 +24,30 @@ export function ApiKeyBar({
   tokensUsed,
 }: ApiKeyBarProps) {
   const [revealed, setRevealed] = useState(false);
+  const isActive = statusLabel !== "no key active";
 
   return (
-    <div className="rounded-lg border border-(--line) bg-(--paper) p-4">
+    <div className="rounded-lg border-2 border-(--pine)/40 bg-(--paper) p-6">
       <div className="flex items-baseline justify-between">
         <h2 className="font-serif text-lg font-semibold text-(--ink)">
           Anthropic API key
         </h2>
-        <p className="font-mono text-[11px] text-(--ink-muted)">{statusLabel}</p>
+        <span className="flex items-center gap-1.5 font-mono text-[11px] text-(--ink-muted)">
+          <span
+            aria-hidden
+            className="h-1.5 w-1.5 rounded-full"
+            style={{
+              background: isActive ? "var(--pine)" : "var(--ink-muted)",
+            }}
+          />
+          {statusLabel}
+        </span>
       </div>
       <p className="mt-1 text-xs text-(--ink-muted)">
         Session-only, never stored.
       </p>
       <form
-        className="mt-3 flex flex-wrap items-center gap-2"
+        className="mt-4 flex flex-wrap items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
@@ -84,9 +94,11 @@ export function ApiKeyBar({
           </button>
         )}
       </form>
-      <div className="mt-2 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between">
         {errorMessage ? (
-          <p className="font-mono text-xs text-(--rust)">{errorMessage}</p>
+          <p className="font-mono text-[11px] font-normal text-(--rust)/85">
+            {errorMessage}
+          </p>
         ) : (
           <span />
         )}

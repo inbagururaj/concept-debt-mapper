@@ -164,17 +164,17 @@ export function Dashboard({
         : "no key active";
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-8">
       {topRiskPrediction && (
-        <div className="rounded-lg border border-(--rust) bg-(--paper) p-4">
-          <p className="font-sans text-xs font-medium text-(--ink-muted)">
+        <div className="rounded-lg border border-(--rust) bg-(--paper) p-6">
+          <p className="font-sans text-[11px] font-medium tracking-wide text-(--ink-muted) uppercase">
             Next concept likely to fail
           </p>
-          <p className="mt-1 font-serif text-xl font-semibold text-(--ink)">
+          <p className="mt-1.5 font-serif text-2xl font-bold text-(--ink)">
             {topRiskPrediction.topic} —{" "}
             {Math.round(topRiskPrediction.riskProbability * 100)}% risk
           </p>
-          <p className="mt-1 text-sm text-(--ink-muted)">
+          <p className="mt-1.5 text-sm text-(--ink)/80">
             {headlineReason(topRiskPrediction)}
           </p>
         </div>
@@ -199,7 +199,7 @@ export function Dashboard({
             selectedTopic={selectedTopic}
             onSelectTopic={handleSelectTopic}
           />
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
             <ScoreOverview student={student} curriculum={curriculum} />
             {selectedTopic ? (
               <DetailPanel
@@ -212,7 +212,7 @@ export function Dashboard({
                 onToggleReviewTopic={handleToggleReviewTopic}
               />
             ) : (
-              <div className="rounded-lg border border-(--line) bg-(--paper) p-4 text-sm text-(--ink-muted)">
+              <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6 text-sm text-(--ink-muted)">
                 Click a topic to see its evidence, risk reasoning, and review
                 plan.
               </div>
@@ -220,13 +220,13 @@ export function Dashboard({
           </div>
         </>
       ) : (
-        <div className="rounded-lg border border-(--line) bg-(--paper) p-4 text-sm text-(--ink-muted)">
+        <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6 text-sm text-(--ink-muted)">
           {isLoading ? (
             "Reasoning over the prerequisite graph…"
           ) : (
             <>
-              <p>Enter an API key to begin.</p>
-              <p className="mt-1 font-mono text-[11px]">
+              <p className="text-(--ink)/80">Enter an API key to begin.</p>
+              <p className="mt-1 font-mono text-[11px] text-(--ink-muted)">
                 Or set ANTHROPIC_API_KEY in .env.local.
               </p>
             </>

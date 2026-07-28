@@ -9,7 +9,7 @@ export function ScoreOverview({ student, curriculum }: ScoreOverviewProps) {
   const untestedCount = curriculum.length - student.history.length;
 
   return (
-    <div className="rounded-lg border border-(--line) bg-(--paper) p-4">
+    <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6">
       <div className="flex items-baseline justify-between">
         <h2 className="font-serif text-lg font-semibold text-(--ink)">
           {student.name} — performance history
@@ -19,7 +19,7 @@ export function ScoreOverview({ student, curriculum }: ScoreOverviewProps) {
           {untestedCount} untested
         </p>
       </div>
-      <div className="mt-3 overflow-x-auto">
+      <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-(--line) text-left text-(--ink-muted)">

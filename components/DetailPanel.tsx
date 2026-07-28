@@ -34,7 +34,7 @@ export function DetailPanel({
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
   return (
-    <div className="rounded-lg border border-(--line) bg-(--paper) p-4">
+    <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6">
       <h2 className="font-serif text-lg font-semibold text-(--ink)">{topic}</h2>
       <div className="mt-3 flex gap-1 border-b border-(--line)">
         {TABS.map((tab) => (

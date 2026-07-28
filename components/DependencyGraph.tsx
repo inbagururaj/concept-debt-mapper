@@ -52,8 +52,8 @@ export function DependencyGraph({
   const evidenceTopics = new Set(student.history.map((h) => h.topic));
 
   return (
-    <div className="rounded-lg border border-(--line) bg-(--paper) overflow-hidden">
-      <div className="flex items-baseline justify-between px-4 pt-4">
+    <div className="rounded-lg border border-(--line)/60 bg-(--paper) overflow-hidden">
+      <div className="flex items-baseline justify-between px-6 pt-6">
         <h2 className="font-serif text-lg font-semibold text-(--ink)">
           Prerequisite dependency graph
         </h2>
@@ -62,7 +62,7 @@ export function DependencyGraph({
           (advanced) · click a node for detail
         </p>
       </div>
-      <div className="overflow-x-auto px-2 py-2">
+      <div className="overflow-x-auto px-4 py-2">
         <svg width={width} height={height} role="img" aria-label="Algebra 1 prerequisite dependency graph, flowing left to right by prerequisite depth">
           <g>
             {curriculum.flatMap((t) =>

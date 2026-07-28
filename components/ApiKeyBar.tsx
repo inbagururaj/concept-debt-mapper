@@ -34,8 +34,7 @@ export function ApiKeyBar({
         <p className="font-mono text-[11px] text-(--ink-muted)">{statusLabel}</p>
       </div>
       <p className="mt-1 text-xs text-(--ink-muted)">
-        Stored only in this browser session, never sent anywhere but
-        Anthropic. It resets on reload.
+        Session-only, never stored.
       </p>
       <form
         className="mt-3 flex flex-wrap items-center gap-2"

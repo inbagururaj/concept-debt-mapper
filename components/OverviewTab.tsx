@@ -10,12 +10,11 @@ export function OverviewTab({ topic, evidence }: OverviewTabProps) {
     return (
       <div className="text-sm text-(--ink)">
         <p className="font-mono text-xs text-(--ink-muted)">
-          No performance record exists for &ldquo;{topic}&rdquo; yet.
+          &ldquo;{topic}&rdquo; is untested.
         </p>
         <p className="mt-2">
-          This topic is untested. Any risk shown for it is inferred entirely
-          from evidence on its prerequisites — see the &ldquo;Why at
-          risk&rdquo; tab.
+          Risk here comes entirely from prerequisite evidence — see
+          &ldquo;Why at risk.&rdquo;
         </p>
       </div>
     );

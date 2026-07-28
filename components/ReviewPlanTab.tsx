@@ -37,9 +37,8 @@ export function ReviewPlanTab({
     <div className="space-y-4 text-sm text-(--ink)">
       {options.length === 0 ? (
         <p className="font-mono text-xs text-(--ink-muted)">
-          No prerequisite topics are driving this risk — remediation would
-          need to focus on &ldquo;{topic}&rdquo; itself, which this
-          estimator does not model.
+          No prerequisites driving this risk — it&rsquo;s intrinsic to
+          &ldquo;{topic}&rdquo;, which this estimator doesn&rsquo;t model.
         </p>
       ) : (
         <div>

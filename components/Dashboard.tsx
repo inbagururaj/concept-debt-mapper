@@ -213,17 +213,24 @@ export function Dashboard({
               />
             ) : (
               <div className="rounded-lg border border-(--line) bg-(--paper) p-4 text-sm text-(--ink-muted)">
-                Click a topic in the dependency graph to see its evidence, the
-                model&rsquo;s risk reasoning, and a review plan.
+                Click a topic to see its evidence, risk reasoning, and review
+                plan.
               </div>
             )}
           </div>
         </>
       ) : (
         <div className="rounded-lg border border-(--line) bg-(--paper) p-4 text-sm text-(--ink-muted)">
-          {isLoading
-            ? "Reasoning over the prerequisite graph and performance evidence…"
-            : "No predictions yet — enter an Anthropic API key above and run it, or set ANTHROPIC_API_KEY in .env.local on the server."}
+          {isLoading ? (
+            "Reasoning over the prerequisite graph…"
+          ) : (
+            <>
+              <p>Enter an API key to begin.</p>
+              <p className="mt-1 font-mono text-[11px]">
+                Or set ANTHROPIC_API_KEY in .env.local.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -49,7 +49,14 @@ export function ApiKeyBar({
           value={apiKey}
           onChange={(e) => onApiKeyChange(e.target.value)}
           placeholder="sk-ant-..."
-          autoComplete="off"
+          name="anthropic-api-key-no-autofill"
+          id="anthropic-api-key-no-autofill"
+          autoComplete="new-password"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-1p-ignore
+          data-lpignore="true"
           disabled={loading}
           className="min-w-0 flex-1 rounded border border-(--line) bg-(--paper-raised) px-2.5 py-1.5 font-mono text-xs text-(--ink) outline-none focus:border-(--pine) disabled:opacity-60"
         />

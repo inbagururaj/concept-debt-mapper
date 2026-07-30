@@ -9,7 +9,10 @@ interface DataSourceBarProps {
   dataSource: DataSource;
   onDataSourceChange: (source: DataSource) => void;
   onFileSelected: (file: File) => void;
-  uploadedStudent: StudentProfile | null;
+  /** Name of the currently-selected file, shown before it's been parsed. */
+  fileName: string | null;
+  /** Set once the file has actually been parsed (by the AI, on run) — null before then, even if a file is selected. */
+  parsedStudent: StudentProfile | null;
   csvError?: string | null;
   onRun: () => void;
   canRun: boolean;
@@ -20,18 +23,20 @@ interface DataSourceBarProps {
 
 /**
  * Lets the demo run against real (uploaded) student data instead of the
- * hardcoded Jordan M. sample, for any subject — not just Algebra 1. Only
- * the performance data source changes for the demo path; for uploads,
- * Dashboard also generates a prerequisite graph (graph-builder.ts) for
- * whatever topics appear in the file, since there's no hardcoded graph to
- * reuse. This component only produces a StudentProfile and hands it to
- * Dashboard's onRun — it doesn't know about the graph step.
+ * hardcoded Jordan M. sample, for any subject and any reasonable gradebook
+ * layout — not just Algebra 1 and not a fixed column format. Column
+ * naming/order isn't validated here: the raw file text is handed to
+ * Dashboard's onRun, which sends it to /api/parse-upload — one combined
+ * call that both interprets the file's structure and generates a
+ * prerequisite graph for whatever topics it finds. This component doesn't
+ * know the file's actual content until that call comes back.
  */
 export function DataSourceBar({
   dataSource,
   onDataSourceChange,
   onFileSelected,
-  uploadedStudent,
+  fileName,
+  parsedStudent,
   csvError,
   onRun,
   canRun,
@@ -76,9 +81,11 @@ export function DataSourceBar({
       {dataSource === "upload" && (
         <div className="mt-4 space-y-2">
           <p className="text-xs text-(--ink-muted)">
-            CSV with header <code className="font-mono">student,topic,score,mistakes</code> — one
-            row per topic, mistakes separated by <code className="font-mono">;</code>. Any
-            subject — topics and prerequisites are inferred automatically from your data.
+            Upload any gradebook-style CSV — we&rsquo;ll figure out the structure. One row per
+            topic for a single student; column names and order don&rsquo;t matter (e.g.
+            &ldquo;name&rdquo; or &ldquo;student&rdquo;, &ldquo;score&rdquo; or
+            &ldquo;grade&rdquo;, mistakes as free text or a list). Any subject — topics and
+            prerequisites are inferred automatically from your data.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -100,10 +107,14 @@ export function DataSourceBar({
             >
               choose CSV file
             </button>
-            {uploadedStudent && (
+            {parsedStudent ? (
               <span className="font-mono text-[11px] text-(--pine)">
-                loaded: {uploadedStudent.name} ({uploadedStudent.history.length} topics)
+                parsed: {parsedStudent.name} ({parsedStudent.history.length} topics)
               </span>
+            ) : (
+              fileName && (
+                <span className="font-mono text-[11px] text-(--ink-muted)">{fileName}</span>
+              )
             )}
             <button
               type="button"

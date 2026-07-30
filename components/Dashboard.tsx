@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { GenerateGraphResponse } from "@/app/api/generate-graph/route";
+import type { ParseUploadResponse } from "@/app/api/parse-upload/route";
 import type { PredictResponse } from "@/app/api/predict/route";
-import { parseStudentCsv } from "@/lib/csv";
 import type { RiskPrediction, StudentProfile, TokenUsage, Topic } from "@/lib/types";
 import { ApiKeyBar } from "./ApiKeyBar";
 import { DataSourceBar, type DataSource } from "./DataSourceBar";
@@ -62,15 +61,23 @@ export function Dashboard({
   // generated for that upload.
   const [activeCurriculum, setActiveCurriculum] = useState<Topic[]>(curriculum);
   const [dataSource, setDataSource] = useState<DataSource>("demo");
-  const [uploadedStudent, setUploadedStudent] = useState<StudentProfile | null>(null);
-  // Cached per uploaded file so re-running (e.g. after fixing a bad key)
-  // doesn't re-spend a graph-generation call — cleared whenever a new file
-  // is parsed.
-  const [uploadedCurriculum, setUploadedCurriculum] = useState<Topic[] | null>(null);
+  // Raw text of the currently-selected file — sent to /api/parse-upload as
+  // one combined "extract + build graph" call. Kept separate from the
+  // parsed result below since selecting a new file must invalidate any
+  // previously parsed data without needing a fetch first.
+  const [rawCsvText, setRawCsvText] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  // Cached result of the combined parse+graph call for the current file,
+  // so re-running (e.g. after fixing a bad key) doesn't re-spend that call
+  // — cleared whenever a new file is selected.
+  const [parsedUpload, setParsedUpload] = useState<{
+    student: StudentProfile;
+    curriculum: Topic[];
+  } | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
-  // True only while the one-off graph-generation call for an upload is in
-  // flight — distinguishes that phase from the prediction call itself in
-  // the DataSourceBar button label; both are covered by `isLoading`.
+  // True only while the one-off combined parse+graph call for an upload is
+  // in flight — distinguishes that phase from the prediction call itself
+  // in the DataSourceBar button label; both are covered by `isLoading`.
   const [graphPhase, setGraphPhase] = useState(false);
   // Driven by hasEnvKey, not initialStatus — a call that errored (rate
   // limit, timeout, bad response) doesn't mean the key is missing.
@@ -172,41 +179,53 @@ export function Dashboard({
   };
 
   /**
-   * Runs prediction against the uploaded student. If no graph has been
-   * generated for this file yet, generates one first (one Claude call),
-   * caches it in `uploadedCurriculum`, then reuses it on subsequent runs
-   * (retry after fixing a key, re-running with a different provider, etc.)
-   * without spending another graph-generation call.
+   * Runs prediction against the uploaded file. If it hasn't been parsed
+   * yet, sends the raw CSV text to /api/parse-upload — one combined call
+   * that both extracts structured student records (regardless of the
+   * file's actual column naming) and generates a prerequisite graph for
+   * the topics found — caches the result in `parsedUpload`, then reuses it
+   * on subsequent runs (retry after fixing a key, etc.) without spending
+   * another call.
    */
   const handleRunUploaded = async () => {
-    if (!uploadedStudent || isLoading) return;
+    if (!rawCsvText || isLoading) return;
     const key = apiKey.trim();
     if (!key && !hasEnvKey) return;
 
-    let curriculumForRun = uploadedCurriculum;
-    if (!curriculumForRun) {
+    let upload = parsedUpload;
+    if (!upload) {
       setIsLoading(true);
       setGraphPhase(true);
       setErrorMessage(undefined);
-      const topics = [...new Set(uploadedStudent.history.map((h) => h.topic))];
+      setCsvError(null);
       try {
-        const res = await fetch("/api/generate-graph", {
+        const res = await fetch("/api/parse-upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ apiKey: key || undefined, topics }),
+          body: JSON.stringify({ apiKey: key || undefined, csv: rawCsvText }),
         });
-        const data = (await res.json()) as GenerateGraphResponse;
+        const data = (await res.json()) as ParseUploadResponse;
         if (!data.ok) {
-          setErrorMessage(data.message);
+          // "unparseable" still cost tokens (the model made a real attempt
+          // and reported back) — the other failure kinds (missing-key,
+          // network/server error) never reached the model, so no usage.
+          if (data.usage) {
+            setTokensUsed((t) => t + data.usage!.inputTokens + data.usage!.outputTokens);
+          }
+          if (data.kind === "unparseable") {
+            setCsvError(data.message);
+          } else {
+            setErrorMessage(data.message);
+          }
           setIsLoading(false);
           setGraphPhase(false);
           return;
         }
-        curriculumForRun = data.curriculum;
-        setUploadedCurriculum(data.curriculum);
+        upload = { student: data.student, curriculum: data.curriculum };
+        setParsedUpload(upload);
         setTokensUsed((t) => t + data.usage.inputTokens + data.usage.outputTokens);
       } catch {
-        setErrorMessage("Network error while generating the prerequisite graph.");
+        setErrorMessage("Network error while parsing the uploaded file.");
         setIsLoading(false);
         setGraphPhase(false);
         return;
@@ -214,13 +233,13 @@ export function Dashboard({
       setGraphPhase(false);
     }
 
-    runPrediction(uploadedStudent, curriculumForRun);
+    runPrediction(upload.student, upload.curriculum);
   };
 
   const handleSubmitKey = () => {
     if (!apiKey.trim() || isLoading) return;
     if (dataSource === "upload") {
-      if (!uploadedStudent) {
+      if (!rawCsvText) {
         setErrorMessage("Upload a CSV first.");
         return;
       }
@@ -232,17 +251,18 @@ export function Dashboard({
 
   const handleFileSelected = (file: File) => {
     setCsvError(null);
-    setUploadedStudent(null);
-    setUploadedCurriculum(null);
+    setErrorMessage(undefined);
+    setFileName(file.name);
+    setRawCsvText(null);
+    setParsedUpload(null);
     file
       .text()
       .then((text) => {
-        const result = parseStudentCsv(text);
-        if (result.error) {
-          setCsvError(result.error);
+        if (text.trim().length === 0) {
+          setCsvError("The file is empty.");
           return;
         }
-        setUploadedStudent(result.student ?? null);
+        setRawCsvText(text);
       })
       .catch(() => setCsvError("Could not read the file."));
   };
@@ -282,7 +302,7 @@ export function Dashboard({
 
   const statusLabel = isLoading
     ? graphPhase
-      ? "generating graph…"
+      ? "reading upload…"
       : "validating…"
     : keySource === "env"
       ? "server key active"
@@ -320,12 +340,15 @@ export function Dashboard({
         dataSource={dataSource}
         onDataSourceChange={setDataSource}
         onFileSelected={handleFileSelected}
-        uploadedStudent={uploadedStudent}
+        fileName={fileName}
+        parsedStudent={parsedUpload?.student ?? null}
         csvError={csvError}
         onRun={() => void handleRunUploaded()}
-        canRun={Boolean(uploadedStudent) && !csvError && (hasEnvKey || apiKey.trim().length > 0)}
+        canRun={Boolean(rawCsvText) && !csvError && (hasEnvKey || apiKey.trim().length > 0)}
         loading={isLoading}
-        runLabel={graphPhase ? "generating graph…" : isLoading ? "running…" : "run prediction on this data"}
+        runLabel={
+          graphPhase ? "reading & building graph…" : isLoading ? "running…" : "run prediction on this data"
+        }
         demoStudentName={student.name}
       />
 
@@ -362,7 +385,7 @@ export function Dashboard({
         <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6 text-sm text-(--ink-muted)">
           {isLoading ? (
             graphPhase
-              ? "Generating a prerequisite graph for your topics…"
+              ? "Reading your file and building a prerequisite graph for it…"
               : "Reasoning over the prerequisite graph…"
           ) : hasEnvKey ? (
             <p className="text-(--ink)/80">

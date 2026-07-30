@@ -41,7 +41,7 @@ export default async function Home() {
           Concept Debt Mapper
         </h1>
         <p className="mt-2 max-w-2xl text-base text-(--ink)/80">
-          Predicts {STUDENT.name}&rsquo;s next likely struggle in Algebra 1.
+          Predicts next at-risk concept from prerequisite graph + performance evidence.
         </p>
       </header>
       <Dashboard

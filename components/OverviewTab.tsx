@@ -13,7 +13,7 @@ export function OverviewTab({ topic, evidence }: OverviewTabProps) {
           &ldquo;{topic}&rdquo; is untested.
         </p>
         <p className="mt-2">
-          Risk here comes entirely from prerequisite evidence — see
+          Risk driven entirely by prerequisite evidence — see
           &ldquo;Why at risk.&rdquo;
         </p>
       </div>

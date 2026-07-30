@@ -7,7 +7,7 @@ export default function Loading() {
         </h1>
       </header>
       <p className="animate-pulse font-mono text-sm text-(--ink-muted)">
-        Reasoning over the prerequisite graph and performance evidence…
+        Evaluating prerequisite graph and performance evidence…
       </p>
     </main>
   );

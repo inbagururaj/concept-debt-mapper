@@ -10,7 +10,7 @@ export function WhyAtRiskTab({ prediction, evidence }: WhyAtRiskTabProps) {
   if (!prediction) {
     return (
       <p className="font-mono text-xs text-(--ink-muted)">
-        No prediction was returned for this topic.
+        No prediction for this topic.
       </p>
     );
   }
@@ -71,7 +71,7 @@ export function WhyAtRiskTab({ prediction, evidence }: WhyAtRiskTabProps) {
         ) : (
           <p className="mt-1.5 font-mono text-xs text-(--ink-muted)">
             No weak prerequisites traced — risk stems from this
-            topic&rsquo;s own evidence. See reasoning below.
+            topic&rsquo;s own evidence.
           </p>
         )}
       </div>

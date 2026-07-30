@@ -21,7 +21,7 @@ export function ReviewPlanTab({
   if (!prediction) {
     return (
       <p className="font-mono text-xs text-(--ink-muted)">
-        No prediction was returned for this topic.
+        No prediction for this topic.
       </p>
     );
   }
@@ -37,8 +37,8 @@ export function ReviewPlanTab({
     <div className="space-y-4 text-sm text-(--ink)">
       {options.length === 0 ? (
         <p className="font-mono text-xs text-(--ink-muted)">
-          No prerequisites driving this risk — it&rsquo;s intrinsic to
-          &ldquo;{topic}&rdquo;, which this estimator doesn&rsquo;t model.
+          No prerequisites driving this risk — intrinsic to
+          &ldquo;{topic}&rdquo;; not modeled by this estimator.
         </p>
       ) : (
         <div>
@@ -90,8 +90,8 @@ export function ReviewPlanTab({
         </div>
         <p className="mt-2 font-mono text-[11px] text-(--ink-muted)">
           {selectedReviewTopics.length === 0
-            ? "Select prerequisite topics above to see the estimate update."
-            : `Estimate only — assumes review resolves up to 70% of the risk traced to the selected topic(s) (${Math.round((ownEstimate?.traceCoverage ?? 0) * 100)}% of this topic's traced risk is covered by the current selection).`}
+            ? "Select topics above to update estimate."
+            : `Assumes review resolves up to 70% of traced risk (covers ${Math.round((ownEstimate?.traceCoverage ?? 0) * 100)}% of this topic's traced risk).`}
         </p>
       </div>
 

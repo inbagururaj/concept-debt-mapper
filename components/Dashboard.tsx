@@ -346,9 +346,7 @@ export function Dashboard({
         onRun={() => void handleRunUploaded()}
         canRun={Boolean(rawCsvText) && !csvError && (hasEnvKey || apiKey.trim().length > 0)}
         loading={isLoading}
-        runLabel={
-          graphPhase ? "reading & building graph…" : isLoading ? "running…" : "run prediction on this data"
-        }
+        runLabel={graphPhase ? "reading & building graph…" : isLoading ? "running…" : "run prediction"}
         demoStudentName={student.name}
       />
 
@@ -375,8 +373,7 @@ export function Dashboard({
               />
             ) : (
               <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6 text-sm text-(--ink-muted)">
-                Click a topic to see its evidence, risk reasoning, and review
-                plan.
+                Select a topic for evidence, reasoning, and review plan.
               </div>
             )}
           </div>
@@ -384,14 +381,10 @@ export function Dashboard({
       ) : (
         <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6 text-sm text-(--ink-muted)">
           {isLoading ? (
-            graphPhase
-              ? "Reading your file and building a prerequisite graph for it…"
-              : "Reasoning over the prerequisite graph…"
+            graphPhase ? "Parsing upload, building graph…" : "Running prediction…"
           ) : hasEnvKey ? (
             <p className="text-(--ink)/80">
-              {errorMessage
-                ? "See error above."
-                : "Server key detected — waiting on the first prediction."}
+              {errorMessage ? "See error above." : "Server key detected. No prediction run yet."}
             </p>
           ) : (
             <>

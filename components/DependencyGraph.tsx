@@ -63,7 +63,7 @@ export function DependencyGraph({
         </p>
       </div>
       <div className="overflow-x-auto px-4 py-2">
-        <svg width={width} height={height} role="img" aria-label="Algebra 1 prerequisite dependency graph, flowing left to right by prerequisite depth">
+        <svg width={width} height={height} role="img" aria-label="Prerequisite dependency graph, flowing left to right by prerequisite depth">
           <g>
             {curriculum.flatMap((t) =>
               t.prerequisites.map((prereq) => {

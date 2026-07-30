@@ -81,11 +81,8 @@ export function DataSourceBar({
       {dataSource === "upload" && (
         <div className="mt-4 space-y-2">
           <p className="text-xs text-(--ink-muted)">
-            Upload any gradebook-style CSV — we&rsquo;ll figure out the structure. One row per
-            topic for a single student; column names and order don&rsquo;t matter (e.g.
-            &ldquo;name&rdquo; or &ldquo;student&rdquo;, &ldquo;score&rdquo; or
-            &ldquo;grade&rdquo;, mistakes as free text or a list). Any subject — topics and
-            prerequisites are inferred automatically from your data.
+            One row per topic. Column names/order flexible (e.g. name/student, score/grade).
+            Any subject — topics and prerequisites inferred automatically.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <input

@@ -100,10 +100,16 @@ export interface PredictionResult {
  * caller forever. `externalSignal` (e.g. a Route Handler's request.signal)
  * is forwarded so a client-initiated cancel actually aborts the in-flight
  * request to Anthropic, not just the UI's wait for it.
+ *
+ * `student` defaults to the hardcoded demo profile (STUDENT); callers may
+ * pass their own (e.g. parsed from an uploaded CSV) to run the same
+ * prediction logic over real data. The curriculum graph is never
+ * user-supplied — it stays the reviewed, hardcoded CURRICULUM.
  */
 export async function predictRisk(
   userApiKey?: string,
   externalSignal?: AbortSignal,
+  student: StudentProfile = STUDENT,
 ): Promise<PredictionResult> {
   const apiKey = userApiKey?.trim() || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new MissingApiKeyError();
@@ -122,7 +128,7 @@ export async function predictRisk(
     const { output, usage } = await generateText({
       model: provider("claude-sonnet-5"),
       output: Output.object({ schema: predictionSchema }),
-      prompt: buildPrompt(CURRICULUM, STUDENT),
+      prompt: buildPrompt(CURRICULUM, student),
       abortSignal: controller.signal,
     });
     const predictions: RiskPrediction[] = output.predictions.map((p) => ({

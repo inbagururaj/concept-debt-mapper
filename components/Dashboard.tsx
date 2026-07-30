@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PredictResponse } from "@/app/api/predict/route";
+import { parseStudentCsv } from "@/lib/csv";
 import type { RiskPrediction, StudentProfile, TokenUsage, Topic } from "@/lib/types";
 import { ApiKeyBar } from "./ApiKeyBar";
+import { DataSourceBar, type DataSource } from "./DataSourceBar";
 import { DependencyGraph } from "./DependencyGraph";
 import { DetailPanel } from "./DetailPanel";
 import { ScoreOverview } from "./ScoreOverview";
@@ -32,6 +34,8 @@ interface DashboardProps {
   initialUsage?: TokenUsage;
   initialStatus: Status;
   initialMessage?: string;
+  /** Whether ANTHROPIC_API_KEY is set server-side, independent of whether the initial call succeeded. */
+  hasEnvKey: boolean;
 }
 
 export function Dashboard({
@@ -41,12 +45,25 @@ export function Dashboard({
   initialUsage,
   initialStatus,
   initialMessage,
+  hasEnvKey,
 }: DashboardProps) {
   const [predictions, setPredictions] = useState<RiskPrediction[] | null>(
     initialPredictions,
   );
+  // The student whose evidence actually produced `predictions` — starts as
+  // the demo prop (SSR always runs against it) and is swapped to the
+  // uploaded profile only once a run against uploaded data succeeds, so the
+  // graph/evidence panels never show data that doesn't match the
+  // predictions currently on screen.
+  const [activeStudent, setActiveStudent] = useState<StudentProfile>(student);
+  const [dataSource, setDataSource] = useState<DataSource>("demo");
+  const [uploadedStudent, setUploadedStudent] = useState<StudentProfile | null>(null);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [csvWarning, setCsvWarning] = useState<string | null>(null);
+  // Driven by hasEnvKey, not initialStatus — a call that errored (rate
+  // limit, timeout, bad response) doesn't mean the key is missing.
   const [keySource, setKeySource] = useState<KeySource>(
-    initialStatus === "ready" ? "env" : "none",
+    hasEnvKey ? "env" : "none",
   );
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
     initialStatus === "error" ? initialMessage : undefined,
@@ -73,9 +90,16 @@ export function Dashboard({
     };
   }, []);
 
-  const handleSubmitKey = () => {
+  /**
+   * Shared request path for both the API-key bar and the data-source bar.
+   * `studentForRun` is the profile to evaluate — demo (server default,
+   * omitted) or an uploaded one — and becomes `activeStudent` on success so
+   * the graph/evidence panels line up with whatever predictions come back.
+   */
+  const runPrediction = (studentForRun: StudentProfile | undefined) => {
+    if (isLoading) return;
     const key = apiKey.trim();
-    if (!key || isLoading) return;
+    if (!key && !hasEnvKey) return;
 
     cancelledRef.current = false;
     timedOutRef.current = false;
@@ -92,14 +116,20 @@ export function Dashboard({
     fetch("/api/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey: key }),
+      body: JSON.stringify({
+        apiKey: key || undefined,
+        student: studentForRun,
+      }),
       signal: controller.signal,
     })
       .then(async (res) => {
         const data = (await res.json()) as PredictResponse;
         if (data.ok) {
           setPredictions(data.predictions);
-          setKeySource("session");
+          setActiveStudent(studentForRun ?? student);
+          setSelectedTopic(null);
+          setReviewSelection([]);
+          if (key) setKeySource("session");
           setTokensUsed((t) => t + data.usage.inputTokens + data.usage.outputTokens);
         } else {
           setErrorMessage(data.message);
@@ -121,6 +151,38 @@ export function Dashboard({
         abortControllerRef.current = null;
         setIsLoading(false);
       });
+  };
+
+  const handleSubmitKey = () => {
+    if (!apiKey.trim()) return;
+    runPrediction(dataSource === "upload" ? (uploadedStudent ?? undefined) : undefined);
+  };
+
+  const handleRunUploaded = () => {
+    if (!uploadedStudent) return;
+    runPrediction(uploadedStudent);
+  };
+
+  const handleFileSelected = (file: File) => {
+    setCsvError(null);
+    setCsvWarning(null);
+    setUploadedStudent(null);
+    file
+      .text()
+      .then((text) => {
+        const result = parseStudentCsv(text);
+        if (result.error) {
+          setCsvError(result.error);
+          return;
+        }
+        setUploadedStudent(result.student ?? null);
+        if (result.unknownTopics && result.unknownTopics.length > 0) {
+          setCsvWarning(
+            `Ignored ${result.unknownTopics.length} row(s) with topics outside the curriculum: ${result.unknownTopics.join(", ")}`,
+          );
+        }
+      })
+      .catch(() => setCsvError("Could not read the file."));
   };
 
   const handleCancel = () => {
@@ -149,18 +211,19 @@ export function Dashboard({
       : null;
 
   const selectedEvidence = selectedTopic
-    ? student.history.find((h) => h.topic === selectedTopic)
+    ? activeStudent.history.find((h) => h.topic === selectedTopic)
     : undefined;
   const selectedPrediction =
     selectedTopic && predictions
       ? predictions.find((p) => p.topic === selectedTopic)
       : undefined;
 
-  const statusLabel =
-    keySource === "env"
-      ? "using server-configured key"
+  const statusLabel = isLoading
+    ? "validating…"
+    : keySource === "env"
+      ? "server key active"
       : keySource === "session"
-        ? "using your session key"
+        ? "session key active"
         : "no key active";
 
   return (
@@ -189,18 +252,30 @@ export function Dashboard({
         errorMessage={errorMessage}
         tokensUsed={tokensUsed}
       />
+      <DataSourceBar
+        dataSource={dataSource}
+        onDataSourceChange={setDataSource}
+        onFileSelected={handleFileSelected}
+        uploadedStudent={uploadedStudent}
+        csvError={csvError}
+        csvWarning={csvWarning}
+        onRun={handleRunUploaded}
+        canRun={Boolean(uploadedStudent) && !csvError && (hasEnvKey || apiKey.trim().length > 0)}
+        loading={isLoading}
+        demoStudentName={student.name}
+      />
 
       {predictions ? (
         <>
           <DependencyGraph
             curriculum={curriculum}
-            student={student}
+            student={activeStudent}
             predictions={predictions}
             selectedTopic={selectedTopic}
             onSelectTopic={handleSelectTopic}
           />
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <ScoreOverview student={student} curriculum={curriculum} />
+            <ScoreOverview student={activeStudent} curriculum={curriculum} />
             {selectedTopic ? (
               <DetailPanel
                 key={selectedTopic}
@@ -223,6 +298,10 @@ export function Dashboard({
         <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6 text-sm text-(--ink-muted)">
           {isLoading ? (
             "Reasoning over the prerequisite graph…"
+          ) : hasEnvKey ? (
+            <p className="text-(--ink)/80">
+              {errorMessage ?? "Server key detected — waiting on the first prediction."}
+            </p>
           ) : (
             <>
               <p className="text-(--ink)/80">Enter an API key to begin.</p>

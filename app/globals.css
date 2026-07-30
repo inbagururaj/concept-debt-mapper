@@ -38,7 +38,23 @@
   }
 }
 
+html {
+  /* Slight bump over the 16px default — the previous scale read cramped,
+     especially where serif headings sit next to small mono labels. Only
+     affects rem-based Tailwind text utilities; SVG graph-node labels use
+     literal px sizes and are unaffected (they're constrained by fixed
+     foreignObject boxes sized in graph-layout.ts). */
+  font-size: 17px;
+}
+
 body {
   background: var(--paper);
   color: var(--ink);
+}
+
+p {
+  /* Tighter than Preflight's default 1.5 — reads less loose at the new
+     base size without affecting headings or the compact mono labels,
+     which set their own leading (or none, by design). */
+  line-height: 1.45;
 }

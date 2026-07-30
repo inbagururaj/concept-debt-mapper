@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { MissingApiKeyError, predictRisk } from "@/lib/predict";
 import type { RiskPrediction, TokenUsage } from "@/lib/types";
 
 export type PredictResponse =
   | { ok: true; predictions: RiskPrediction[]; usage: TokenUsage }
   | { ok: false; kind: "missing-key" | "error"; message: string };
+
+const studentSchema = z.object({
+  name: z.string().min(1),
+  grade: z.string().min(1),
+  history: z.array(
+    z.object({
+      topic: z.string().min(1),
+      score: z.number().min(0).max(100),
+      mistakes: z.array(z.string()),
+    }),
+  ),
+});
 
 /**
  * Plain Route Handler (not a Server Action) so the client can hold a real
@@ -14,9 +27,20 @@ export type PredictResponse =
  */
 export async function POST(request: Request): Promise<NextResponse<PredictResponse>> {
   let apiKey: string | undefined;
+  let student: z.infer<typeof studentSchema> | undefined;
   try {
-    const body = (await request.json()) as { apiKey?: unknown };
+    const body = (await request.json()) as { apiKey?: unknown; student?: unknown };
     apiKey = typeof body.apiKey === "string" ? body.apiKey : undefined;
+    if (body.student !== undefined) {
+      const parsed = studentSchema.safeParse(body.student);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { ok: false, kind: "error", message: "Malformed student data." },
+          { status: 400 },
+        );
+      }
+      student = parsed.data;
+    }
   } catch {
     return NextResponse.json(
       { ok: false, kind: "error", message: "Malformed request body." },
@@ -25,7 +49,7 @@ export async function POST(request: Request): Promise<NextResponse<PredictRespon
   }
 
   try {
-    const { predictions, usage } = await predictRisk(apiKey, request.signal);
+    const { predictions, usage } = await predictRisk(apiKey, request.signal, student);
     return NextResponse.json({ ok: true, predictions, usage });
   } catch (error) {
     if (error instanceof MissingApiKeyError) {

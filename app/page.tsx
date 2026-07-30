@@ -15,6 +15,11 @@ export default async function Home() {
   let initialStatus: "ready" | "missing-key" | "error" = "missing-key";
   let initialMessage: string | undefined;
 
+  // Checked directly rather than inferred from predictRisk()'s outcome — a
+  // transient call failure (rate limit, timeout, bad response) must not be
+  // reported as "no key", since the env key is still genuinely present.
+  const hasEnvKey = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+
   try {
     const result = await predictRisk();
     predictions = result.predictions;
@@ -46,6 +51,7 @@ export default async function Home() {
         initialUsage={initialUsage}
         initialStatus={initialStatus}
         initialMessage={initialMessage}
+        hasEnvKey={hasEnvKey}
       />
     </main>
   );

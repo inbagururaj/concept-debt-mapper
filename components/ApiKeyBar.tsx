@@ -24,7 +24,8 @@ export function ApiKeyBar({
   tokensUsed,
 }: ApiKeyBarProps) {
   const [revealed, setRevealed] = useState(false);
-  const isActive = statusLabel !== "no key active";
+  const isValidating = statusLabel === "validating…";
+  const isActive = !isValidating && statusLabel !== "no key active";
 
   return (
     <div className="rounded-lg border-2 border-(--pine)/40 bg-(--paper) p-6">
@@ -35,7 +36,7 @@ export function ApiKeyBar({
         <span className="flex items-center gap-1.5 font-mono text-[11px] text-(--ink-muted)">
           <span
             aria-hidden
-            className="h-1.5 w-1.5 rounded-full"
+            className={`h-1.5 w-1.5 rounded-full ${isValidating ? "animate-pulse" : ""}`}
             style={{
               background: isActive ? "var(--pine)" : "var(--ink-muted)",
             }}
@@ -96,7 +97,7 @@ export function ApiKeyBar({
       </form>
       <div className="mt-3 flex items-center justify-between">
         {errorMessage ? (
-          <p className="font-mono text-[11px] font-normal text-(--rust)/85">
+          <p className="font-mono text-[11px] text-(--rust)/85">
             {errorMessage}
           </p>
         ) : (

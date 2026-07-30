@@ -11,19 +11,21 @@ interface DataSourceBarProps {
   onFileSelected: (file: File) => void;
   uploadedStudent: StudentProfile | null;
   csvError?: string | null;
-  csvWarning?: string | null;
   onRun: () => void;
   canRun: boolean;
   loading: boolean;
+  runLabel: string;
   demoStudentName: string;
 }
 
 /**
  * Lets the demo run against real (uploaded) student data instead of the
- * hardcoded Jordan M. sample. Only the performance data source changes —
- * the curriculum graph and prediction/remediation logic are untouched;
- * this component only produces a StudentProfile and hands it to the same
- * pipeline via Dashboard's onRun.
+ * hardcoded Jordan M. sample, for any subject — not just Algebra 1. Only
+ * the performance data source changes for the demo path; for uploads,
+ * Dashboard also generates a prerequisite graph (graph-builder.ts) for
+ * whatever topics appear in the file, since there's no hardcoded graph to
+ * reuse. This component only produces a StudentProfile and hands it to
+ * Dashboard's onRun — it doesn't know about the graph step.
  */
 export function DataSourceBar({
   dataSource,
@@ -31,10 +33,10 @@ export function DataSourceBar({
   onFileSelected,
   uploadedStudent,
   csvError,
-  csvWarning,
   onRun,
   canRun,
   loading,
+  runLabel,
   demoStudentName,
 }: DataSourceBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,8 +77,8 @@ export function DataSourceBar({
         <div className="mt-4 space-y-2">
           <p className="text-xs text-(--ink-muted)">
             CSV with header <code className="font-mono">student,topic,score,mistakes</code> — one
-            row per topic, mistakes separated by <code className="font-mono">;</code>. Topic
-            names must match the Algebra 1 curriculum.
+            row per topic, mistakes separated by <code className="font-mono">;</code>. Any
+            subject — topics and prerequisites are inferred automatically from your data.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -109,14 +111,11 @@ export function DataSourceBar({
               disabled={!canRun || loading}
               className="rounded bg-(--pine) px-3 py-1.5 font-mono text-xs text-(--paper) disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
-              {loading ? "running…" : "run prediction on this data"}
+              {runLabel}
             </button>
           </div>
           {csvError && (
             <p className="font-mono text-[11px] text-(--rust)/85">{csvError}</p>
-          )}
-          {!csvError && csvWarning && (
-            <p className="font-mono text-[11px] text-(--ink-muted)">{csvWarning}</p>
           )}
         </div>
       )}

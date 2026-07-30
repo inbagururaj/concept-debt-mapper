@@ -1,4 +1,3 @@
-import { CURRICULUM } from "./curriculum";
 import type { StudentProfile } from "./types";
 
 /**
@@ -43,19 +42,18 @@ const EXPECTED_HEADERS = ["student", "topic", "score", "mistakes"];
 export interface CsvParseResult {
   student?: StudentProfile;
   error?: string;
-  /** Topic names present in the CSV that don't match any curriculum topic — surfaced as a warning, not a hard failure. */
-  unknownTopics?: string[];
 }
 
 /**
- * Parses uploaded student performance data. Expected header row:
+ * Parses uploaded student performance data for any subject. Expected
+ * header row:
  *   student,topic,score,mistakes
  * `mistakes` is a single field with individual mistakes separated by `;`
  * (empty for none). One row per topic; `student` must be the same value on
- * every row (used as the profile name). Topics are matched case-sensitively
- * against CURRICULUM — rows naming a topic outside the curriculum are kept
- * out of the resulting profile and reported via `unknownTopics`, since
- * predict.ts only reasons over topics in the fixed graph.
+ * every row (used as the profile name). Topic names are not validated
+ * against any fixed curriculum — the caller (Dashboard, via
+ * graph-builder.ts) generates a prerequisite graph for whatever distinct
+ * topics show up here.
  */
 export function parseStudentCsv(raw: string): CsvParseResult {
   const lines = raw
@@ -85,8 +83,6 @@ export function parseStudentCsv(raw: string): CsvParseResult {
     mistakes: header.indexOf("mistakes"),
   };
 
-  const validTopics = new Set(CURRICULUM.map((t) => t.topic));
-  const unknownTopics = new Set<string>();
   let studentName: string | null = null;
   const history: StudentProfile["history"] = [];
   const seenTopics = new Set<string>();
@@ -119,10 +115,6 @@ export function parseStudentCsv(raw: string): CsvParseResult {
       return { error: `Row ${rowNum}: "score" must be a number between 0 and 100, got "${scoreRaw}".` };
     }
 
-    if (!validTopics.has(topic)) {
-      unknownTopics.add(topic);
-      continue;
-    }
     if (seenTopics.has(topic)) {
       return { error: `Row ${rowNum}: duplicate entry for topic "${topic}".` };
     }
@@ -139,18 +131,12 @@ export function parseStudentCsv(raw: string): CsvParseResult {
   if (!studentName) {
     return { error: "No valid data rows found." };
   }
-  if (history.length === 0) {
-    return {
-      error: "None of the rows named a topic from the Algebra 1 curriculum — nothing to predict against.",
-    };
-  }
 
   return {
     student: {
       name: studentName,
-      grade: "Uploaded data — Algebra 1",
+      grade: "Uploaded data",
       history,
     },
-    unknownTopics: unknownTopics.size > 0 ? [...unknownTopics] : undefined,
   };
 }

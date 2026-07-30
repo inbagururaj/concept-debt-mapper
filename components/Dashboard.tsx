@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { GenerateGraphResponse } from "@/app/api/generate-graph/route";
 import type { PredictResponse } from "@/app/api/predict/route";
 import { parseStudentCsv } from "@/lib/csv";
 import type { RiskPrediction, StudentProfile, TokenUsage, Topic } from "@/lib/types";
@@ -56,10 +57,21 @@ export function Dashboard({
   // graph/evidence panels never show data that doesn't match the
   // predictions currently on screen.
   const [activeStudent, setActiveStudent] = useState<StudentProfile>(student);
+  // Same idea as activeStudent, but for the graph: the demo curriculum prop
+  // until an uploaded-data run succeeds, then whatever graph-builder.ts
+  // generated for that upload.
+  const [activeCurriculum, setActiveCurriculum] = useState<Topic[]>(curriculum);
   const [dataSource, setDataSource] = useState<DataSource>("demo");
   const [uploadedStudent, setUploadedStudent] = useState<StudentProfile | null>(null);
+  // Cached per uploaded file so re-running (e.g. after fixing a bad key)
+  // doesn't re-spend a graph-generation call — cleared whenever a new file
+  // is parsed.
+  const [uploadedCurriculum, setUploadedCurriculum] = useState<Topic[] | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
-  const [csvWarning, setCsvWarning] = useState<string | null>(null);
+  // True only while the one-off graph-generation call for an upload is in
+  // flight — distinguishes that phase from the prediction call itself in
+  // the DataSourceBar button label; both are covered by `isLoading`.
+  const [graphPhase, setGraphPhase] = useState(false);
   // Driven by hasEnvKey, not initialStatus — a call that errored (rate
   // limit, timeout, bad response) doesn't mean the key is missing.
   const [keySource, setKeySource] = useState<KeySource>(
@@ -92,11 +104,15 @@ export function Dashboard({
 
   /**
    * Shared request path for both the API-key bar and the data-source bar.
-   * `studentForRun` is the profile to evaluate — demo (server default,
-   * omitted) or an uploaded one — and becomes `activeStudent` on success so
-   * the graph/evidence panels line up with whatever predictions come back.
+   * `studentForRun`/`curriculumForRun` default to the demo profile/graph
+   * (server-side default when omitted) or the uploaded pair — both become
+   * `activeStudent`/`activeCurriculum` on success so the graph/evidence
+   * panels line up with whatever predictions come back.
    */
-  const runPrediction = (studentForRun: StudentProfile | undefined) => {
+  const runPrediction = (
+    studentForRun: StudentProfile | undefined,
+    curriculumForRun: Topic[] | undefined,
+  ) => {
     if (isLoading) return;
     const key = apiKey.trim();
     if (!key && !hasEnvKey) return;
@@ -119,6 +135,7 @@ export function Dashboard({
       body: JSON.stringify({
         apiKey: key || undefined,
         student: studentForRun,
+        curriculum: curriculumForRun,
       }),
       signal: controller.signal,
     })
@@ -127,6 +144,7 @@ export function Dashboard({
         if (data.ok) {
           setPredictions(data.predictions);
           setActiveStudent(studentForRun ?? student);
+          setActiveCurriculum(curriculumForRun ?? curriculum);
           setSelectedTopic(null);
           setReviewSelection([]);
           if (key) setKeySource("session");
@@ -153,20 +171,69 @@ export function Dashboard({
       });
   };
 
-  const handleSubmitKey = () => {
-    if (!apiKey.trim()) return;
-    runPrediction(dataSource === "upload" ? (uploadedStudent ?? undefined) : undefined);
+  /**
+   * Runs prediction against the uploaded student. If no graph has been
+   * generated for this file yet, generates one first (one Claude call),
+   * caches it in `uploadedCurriculum`, then reuses it on subsequent runs
+   * (retry after fixing a key, re-running with a different provider, etc.)
+   * without spending another graph-generation call.
+   */
+  const handleRunUploaded = async () => {
+    if (!uploadedStudent || isLoading) return;
+    const key = apiKey.trim();
+    if (!key && !hasEnvKey) return;
+
+    let curriculumForRun = uploadedCurriculum;
+    if (!curriculumForRun) {
+      setIsLoading(true);
+      setGraphPhase(true);
+      setErrorMessage(undefined);
+      const topics = [...new Set(uploadedStudent.history.map((h) => h.topic))];
+      try {
+        const res = await fetch("/api/generate-graph", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ apiKey: key || undefined, topics }),
+        });
+        const data = (await res.json()) as GenerateGraphResponse;
+        if (!data.ok) {
+          setErrorMessage(data.message);
+          setIsLoading(false);
+          setGraphPhase(false);
+          return;
+        }
+        curriculumForRun = data.curriculum;
+        setUploadedCurriculum(data.curriculum);
+        setTokensUsed((t) => t + data.usage.inputTokens + data.usage.outputTokens);
+      } catch {
+        setErrorMessage("Network error while generating the prerequisite graph.");
+        setIsLoading(false);
+        setGraphPhase(false);
+        return;
+      }
+      setGraphPhase(false);
+    }
+
+    runPrediction(uploadedStudent, curriculumForRun);
   };
 
-  const handleRunUploaded = () => {
-    if (!uploadedStudent) return;
-    runPrediction(uploadedStudent);
+  const handleSubmitKey = () => {
+    if (!apiKey.trim() || isLoading) return;
+    if (dataSource === "upload") {
+      if (!uploadedStudent) {
+        setErrorMessage("Upload a CSV first.");
+        return;
+      }
+      void handleRunUploaded();
+    } else {
+      runPrediction(undefined, undefined);
+    }
   };
 
   const handleFileSelected = (file: File) => {
     setCsvError(null);
-    setCsvWarning(null);
     setUploadedStudent(null);
+    setUploadedCurriculum(null);
     file
       .text()
       .then((text) => {
@@ -176,11 +243,6 @@ export function Dashboard({
           return;
         }
         setUploadedStudent(result.student ?? null);
-        if (result.unknownTopics && result.unknownTopics.length > 0) {
-          setCsvWarning(
-            `Ignored ${result.unknownTopics.length} row(s) with topics outside the curriculum: ${result.unknownTopics.join(", ")}`,
-          );
-        }
       })
       .catch(() => setCsvError("Could not read the file."));
   };
@@ -219,7 +281,9 @@ export function Dashboard({
       : undefined;
 
   const statusLabel = isLoading
-    ? "validating…"
+    ? graphPhase
+      ? "generating graph…"
+      : "validating…"
     : keySource === "env"
       ? "server key active"
       : keySource === "session"
@@ -258,24 +322,24 @@ export function Dashboard({
         onFileSelected={handleFileSelected}
         uploadedStudent={uploadedStudent}
         csvError={csvError}
-        csvWarning={csvWarning}
-        onRun={handleRunUploaded}
+        onRun={() => void handleRunUploaded()}
         canRun={Boolean(uploadedStudent) && !csvError && (hasEnvKey || apiKey.trim().length > 0)}
         loading={isLoading}
+        runLabel={graphPhase ? "generating graph…" : isLoading ? "running…" : "run prediction on this data"}
         demoStudentName={student.name}
       />
 
       {predictions ? (
         <>
           <DependencyGraph
-            curriculum={curriculum}
+            curriculum={activeCurriculum}
             student={activeStudent}
             predictions={predictions}
             selectedTopic={selectedTopic}
             onSelectTopic={handleSelectTopic}
           />
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <ScoreOverview student={activeStudent} curriculum={curriculum} />
+            <ScoreOverview student={activeStudent} curriculum={activeCurriculum} />
             {selectedTopic ? (
               <DetailPanel
                 key={selectedTopic}
@@ -297,10 +361,14 @@ export function Dashboard({
       ) : (
         <div className="rounded-lg border border-(--line)/60 bg-(--paper) p-6 text-sm text-(--ink-muted)">
           {isLoading ? (
-            "Reasoning over the prerequisite graph…"
+            graphPhase
+              ? "Generating a prerequisite graph for your topics…"
+              : "Reasoning over the prerequisite graph…"
           ) : hasEnvKey ? (
             <p className="text-(--ink)/80">
-              {errorMessage ?? "Server key detected — waiting on the first prediction."}
+              {errorMessage
+                ? "See error above."
+                : "Server key detected — waiting on the first prediction."}
             </p>
           ) : (
             <>

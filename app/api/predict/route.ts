@@ -19,6 +19,13 @@ const studentSchema = z.object({
   ),
 });
 
+const curriculumSchema = z.array(
+  z.object({
+    topic: z.string().min(1),
+    prerequisites: z.array(z.string()),
+  }),
+);
+
 /**
  * Plain Route Handler (not a Server Action) so the client can hold a real
  * AbortController tied to `fetch`'s `signal` — aborting it cancels the
@@ -28,8 +35,13 @@ const studentSchema = z.object({
 export async function POST(request: Request): Promise<NextResponse<PredictResponse>> {
   let apiKey: string | undefined;
   let student: z.infer<typeof studentSchema> | undefined;
+  let curriculum: z.infer<typeof curriculumSchema> | undefined;
   try {
-    const body = (await request.json()) as { apiKey?: unknown; student?: unknown };
+    const body = (await request.json()) as {
+      apiKey?: unknown;
+      student?: unknown;
+      curriculum?: unknown;
+    };
     apiKey = typeof body.apiKey === "string" ? body.apiKey : undefined;
     if (body.student !== undefined) {
       const parsed = studentSchema.safeParse(body.student);
@@ -41,6 +53,16 @@ export async function POST(request: Request): Promise<NextResponse<PredictRespon
       }
       student = parsed.data;
     }
+    if (body.curriculum !== undefined) {
+      const parsed = curriculumSchema.safeParse(body.curriculum);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { ok: false, kind: "error", message: "Malformed curriculum data." },
+          { status: 400 },
+        );
+      }
+      curriculum = parsed.data;
+    }
   } catch {
     return NextResponse.json(
       { ok: false, kind: "error", message: "Malformed request body." },
@@ -49,7 +71,7 @@ export async function POST(request: Request): Promise<NextResponse<PredictRespon
   }
 
   try {
-    const { predictions, usage } = await predictRisk(apiKey, request.signal, student);
+    const { predictions, usage } = await predictRisk(apiKey, request.signal, student, curriculum);
     return NextResponse.json({ ok: true, predictions, usage });
   } catch (error) {
     if (error instanceof MissingApiKeyError) {

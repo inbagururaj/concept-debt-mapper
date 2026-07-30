@@ -44,7 +44,7 @@ function buildPrompt(curriculum: Topic[], student: StudentProfile): string {
     })
     .join("\n");
 
-  return `You are analyzing one student's mastery of an Algebra 1 curriculum to predict which topics they are at risk of struggling with, including topics they have not yet attempted.
+  return `You are analyzing one student's mastery of a curriculum to predict which topics they are at risk of struggling with, including topics they have not yet attempted.
 
 PREREQUISITE GRAPH (ground truth, do not contradict it):
 ${graph}
@@ -103,13 +103,16 @@ export interface PredictionResult {
  *
  * `student` defaults to the hardcoded demo profile (STUDENT); callers may
  * pass their own (e.g. parsed from an uploaded CSV) to run the same
- * prediction logic over real data. The curriculum graph is never
- * user-supplied — it stays the reviewed, hardcoded CURRICULUM.
+ * prediction logic over real data. `curriculum` defaults to the reviewed,
+ * hardcoded Algebra 1 CURRICULUM; the upload path passes a graph generated
+ * by graph-builder.ts instead, for whatever subject the uploaded topics
+ * belong to.
  */
 export async function predictRisk(
   userApiKey?: string,
   externalSignal?: AbortSignal,
   student: StudentProfile = STUDENT,
+  curriculum: Topic[] = CURRICULUM,
 ): Promise<PredictionResult> {
   const apiKey = userApiKey?.trim() || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new MissingApiKeyError();
@@ -128,7 +131,7 @@ export async function predictRisk(
     const { output, usage } = await generateText({
       model: provider("claude-sonnet-5"),
       output: Output.object({ schema: predictionSchema }),
-      prompt: buildPrompt(CURRICULUM, student),
+      prompt: buildPrompt(curriculum, student),
       abortSignal: controller.signal,
     });
     const predictions: RiskPrediction[] = output.predictions.map((p) => ({

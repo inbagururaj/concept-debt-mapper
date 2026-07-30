@@ -24,8 +24,11 @@ export function ApiKeyBar({
   tokensUsed,
 }: ApiKeyBarProps) {
   const [revealed, setRevealed] = useState(false);
-  const isValidating = statusLabel === "validating…";
-  const isActive = !isValidating && statusLabel !== "no key active";
+  // Driven by `loading` directly rather than matching statusLabel text —
+  // statusLabel now carries more than one loading-phase string
+  // ("validating…", "generating graph…"), and string-matching would need
+  // updating every time a new phase label is added.
+  const isActive = !loading && statusLabel !== "no key active";
 
   return (
     <div className="rounded-lg border-2 border-(--pine)/40 bg-(--paper) p-6">
@@ -36,7 +39,7 @@ export function ApiKeyBar({
         <span className="flex items-center gap-1.5 font-mono text-[11px] text-(--ink-muted)">
           <span
             aria-hidden
-            className={`h-1.5 w-1.5 rounded-full ${isValidating ? "animate-pulse" : ""}`}
+            className={`h-1.5 w-1.5 rounded-full ${loading ? "animate-pulse" : ""}`}
             style={{
               background: isActive ? "var(--pine)" : "var(--ink-muted)",
             }}
